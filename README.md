@@ -39,9 +39,11 @@ Use a matching Expo Go version for SDK 57 or a development build. In Settings, e
 
 This is a single-user prototype. Uploads are limited to 200 MB and 30 minutes. One render request is processed at a time. Short videos produce one clip rather than duplicates. Outputs are 720x1280 or 1280x720. Rendering is synchronous; large jobs may exceed hosting request limits. Start with small videos. A durable worker queue is needed for long-running production use.
 
-Clips are temporary: they disappear on restart/redeploy and older job folders are cleaned on subsequent uploads after 24 hours. Download important clips immediately. Free Render compute has not yet been benchmarked for this processing load.
+On the free demonstration service, clips are temporary: they disappear on restart/redeploy and older job folders are cleaned on subsequent uploads after 24 hours. Download important clips immediately. Free Render compute has not yet been benchmarked for this processing load.
 
-The existing YouTube OAuth endpoints are only a preliminary scaffold: token persistence and OAuth state validation are not implemented. Do not configure them for production yet. Automatic posting, the three-hour schedule, Drive integration, music selection, TikTok/Meta connectors, persistent clip history and an installable APK remain unfinished. The restored UI no longer claims that clips have been scheduled or published.
+Social OAuth connections, encrypted token persistence, platform upload adapters and a publishing scheduler are implemented. See [SOCIAL_SETUP.md](SOCIAL_SETUP.md) for activation, required developer credentials and platform restrictions. The current free Render instance deliberately disables account connections/scheduling until persistent storage is configured. No platform credentials or live posting tests are included.
+
+TikTok uses inbox drafts requiring completion in TikTok. Instagram and Facebook publish Reels to professional accounts/Pages. YouTube supports selected privacy and audience. Direct Post on TikTok is not implemented. An Android APK build workflow is provided; its native build result and phone testing must be checked separately.
 
 ## Verify
 

@@ -2,13 +2,14 @@
   "expo": {
     "name": "GameClip Publisher",
     "slug": "gameclip-publisher",
-    "version": "2.1.0",
+    "version": "2.2.0",
     "orientation": "portrait",
     "ios": {
       "supportsTablet": true
     },
     "android": {
-      "package": "com.gameclip.publisher"
+      "package": "com.gameclip.publisher",
+      "versionCode": 2
     },
     "sdkVersion": "57.0.0",
     "plugins": [
@@ -17,7 +18,8 @@
         {
           "microphonePermission": false
         }
-      ]
+      ],
+      "expo-secure-store"
     ]
   }
 }

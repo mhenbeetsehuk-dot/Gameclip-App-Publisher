@@ -12,3 +12,7 @@ node_modules/
 data/
 secrets/
 .pytest_cache/
+mobile/android/
+mobile/ios/
+core
+core.*
