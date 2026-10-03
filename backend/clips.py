@@ -1,5 +1,6 @@
 """Bounded, single-user clip creation and temporary downloads."""
 import os
+from . import store
 import secrets
 import shutil
 import subprocess
@@ -13,7 +14,7 @@ from fastapi.responses import FileResponse
 from .clipper import action_windows, render, duration
 
 router = APIRouter()
-ROOT = Path(os.getenv('CLIP_DIR', '/tmp/gameclip-clips'))
+ROOT = Path(os.getenv('CLIP_DIR', str(store.data_dir() / 'clips')))
 LOCK = threading.Lock()
 MAX_BYTES = 200 * 1024 * 1024
 TTL = 24 * 3600
@@ -38,8 +39,10 @@ def create_clips(video: UploadFile = File(...), clip_count: int = Form(6, ge=1, 
             raise HTTPException(503, 'The server needs FFmpeg and ffprobe installed.')
         ROOT.mkdir(parents=True, exist_ok=True)
         for old in ROOT.iterdir():
-            if old.is_dir() and old.stat().st_mtime < time.time() - TTL:
+            if not store.durable() and old.is_dir() and old.stat().st_mtime < time.time() - TTL:
                 shutil.rmtree(old)
+        if shutil.disk_usage(ROOT).free < 600*1024*1024:
+            raise HTTPException(507,'Server storage is nearly full. Remove downloaded clips before uploading more.')
         ext = Path(video.filename or '').suffix.lower()
         if ext not in {'.mp4', '.mov', '.mkv', '.webm', '.m4v'}:
             raise HTTPException(400, 'Choose an MP4, MOV, MKV, WebM or M4V video.')
@@ -65,11 +68,16 @@ def create_clips(video: UploadFile = File(...), clip_count: int = Form(6, ge=1, 
         for i, (_, start) in enumerate(windows, 1):
             name = f'clip_{i:02d}.mp4'
             render(src, start, work / name, min(seconds, clip_duration), vertical=vertical)
-            clips.append({'name': name, 'start': round(start, 2),
+            clip_id = secrets.token_hex(16)
+            clips.append({'id': clip_id, 'name': name, 'start': round(start, 2),
                           'download_path': f'/api/clips/{work.name}/{name}'})
+        if store.durable():
+            with store.db() as c:
+                for clip in clips:
+                    c.execute('INSERT INTO clips VALUES(?,?,?,?)',(clip['id'],clip['name'],str(work/clip['name']),time.time()))
         src.unlink()
-        return {'clips': clips, 'status': 'created', 'storage': 'temporary',
-                'message': 'Download your clips before the server restarts. Publishing is not connected.'}
+        return {'clips': clips, 'status': 'created', 'storage': 'persistent' if store.durable() else 'temporary',
+                'message': 'Clips saved for scheduling.' if store.durable() else 'Download clips before the server restarts. Scheduling requires persistent storage.'}
     except HTTPException:
         if work:
             shutil.rmtree(work, ignore_errors=True)

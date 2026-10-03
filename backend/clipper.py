@@ -1,5 +1,5 @@
 
-import cv2,subprocess
+import cv2,subprocess,json
 from pathlib import Path
 
 def duration(path):
@@ -28,8 +28,14 @@ def action_windows(path,count,clip_len=30):
 
 def render(src,start,out,clip_len=30,music=None,music_start=0,vertical=True):
  vf="scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2" if vertical else "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2"
- cmd=["ffmpeg","-y","-ss",str(start),"-i",str(src),"-t",str(clip_len)]
+ cmd=["ffmpeg","-y","-ss",str(start),"-i",str(src)]
  if music and Path(music).exists():
   cmd+=["-ss",str(music_start),"-i",str(music),"-map","0:v:0","-map","1:a:0"]
- cmd+=["-vf",vf,"-threads","1","-pix_fmt","yuv420p","-movflags","+faststart","-c:v","libx264","-preset","veryfast","-c:a","aac","-shortest",str(out)]
+ elif not any(s['codec_type']=='audio' for s in media_info(src)['streams']):
+  cmd+=["-f","lavfi","-i","anullsrc=r=48000:cl=stereo","-map","0:v:0","-map","1:a:0"]
+ cmd+=["-t",str(clip_len),"-vf",vf,"-r","30","-threads","1","-pix_fmt","yuv420p","-movflags","+faststart","-c:v","libx264","-preset","veryfast","-c:a","aac","-b:a","128k","-ar","48000","-shortest",str(out)]
  subprocess.run(cmd,check=True,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,timeout=600)
+
+
+def media_info(path):
+ return json.loads(subprocess.run(['ffprobe','-v','error','-show_streams','-show_format','-of','json',str(path)],capture_output=True,text=True,check=True,timeout=30).stdout)

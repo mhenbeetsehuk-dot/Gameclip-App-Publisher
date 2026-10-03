@@ -1,0 +1,46 @@
+# Optional paid deployment. Review pricing before applying this Blueprint.
+# Single always-on instance: API and publishing scheduler share one persistent disk.
+services:
+  - type: web
+    name: gameclip-publisher
+    runtime: python
+    plan: starter
+    region: frankfurt
+    numInstances: 1
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    maxShutdownDelaySeconds: 300
+    disk:
+      name: gameclip-data
+      mountPath: /var/data
+      sizeGB: 5
+    envVars:
+      - key: DATA_DIR
+        value: /var/data/gameclip
+      - key: PERSISTENT_STORAGE_CONFIRMED
+        value: 'true'
+      - key: SCHEDULER_ENABLED
+        value: 'true'
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: TOKEN_ENCRYPTION_KEY
+        sync: false
+      - key: GAMECLIP_API_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: TIKTOK_CLIENT_KEY
+        sync: false
+      - key: TIKTOK_CLIENT_SECRET
+        sync: false
+      - key: META_APP_ID
+        sync: false
+      - key: META_APP_SECRET
+        sync: false
+      - key: META_API_VERSION
+        sync: false
+      - key: PYTHON_VERSION
+        value: 3.12.12
