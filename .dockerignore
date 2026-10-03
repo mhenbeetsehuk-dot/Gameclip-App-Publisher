@@ -1,0 +1,11 @@
+.git
+.venv
+.env
+.env.*
+node_modules
+mobile
+tests
+__pycache__
+*.pyc
+secrets
+data
