@@ -5,7 +5,10 @@ import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import RedirectResponse
 
-app = FastAPI(title="GameClip Publisher API", version="0.1.0")
+from .clips import router as clips_router
+
+app = FastAPI(title="GameClip Publisher API", version="0.2.0")
+app.include_router(clips_router)
 
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -13,7 +16,7 @@ YOUTUBE_SCOPE = "https://www.googleapis.com/auth/youtube.upload"
 
 @app.get("/")
 def root():
-    return {"app": "GameClip Publisher", "status": "ok", "version": "0.1.0"}
+    return {"app": "GameClip Publisher", "status": "ok", "version": "0.2.0"}
 
 @app.get("/health")
 def health():

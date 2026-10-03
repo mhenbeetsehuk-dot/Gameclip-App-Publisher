@@ -5,3 +5,10 @@ venv/
 .env
 .env.*
 !.env.example
+node_modules/
+.expo/
+*.apk
+*.aab
+data/
+secrets/
+.pytest_cache/
