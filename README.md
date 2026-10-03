@@ -23,7 +23,7 @@ export GAMECLIP_API_KEY='replace-with-a-long-random-key'
 
 Windows PowerShell: use `.venv\Scripts\python -m pip install -r requirements.txt`, set `$env:GAMECLIP_API_KEY='your-key'`, then run `.venv\Scripts\python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000`.
 
-Docker alternatively packages FFmpeg with Python. `render.yaml` deploys this Dockerfile with a generated `GAMECLIP_API_KEY` and `/health` health check. Enter that generated value into the phone settings; never put it in EXPO_PUBLIC variables or Git.
+Docker alternatively packages FFmpeg with Python. `render.yaml` uses Render's Python runtime, which includes FFmpeg, with a generated `GAMECLIP_API_KEY` and `/health` health check. The Dockerfile remains available for deployments elsewhere. Enter that generated value into the phone settings; never put it in EXPO_PUBLIC variables or Git.
 
 ## Run the phone app
 
