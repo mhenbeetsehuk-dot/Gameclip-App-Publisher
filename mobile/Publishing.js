@@ -39,7 +39,7 @@ export default function Publishing({api,apiKey,mode}){
   function enqueue(){
     if(!selected.length||!platforms.length||!title.trim())return Alert.alert('Choose your posts','Select clips, platforms and enter a title.');
     if(Number.isNaN(Date.parse(when)))return Alert.alert('Invalid date','Use an ISO date with timezone, for example 2026-10-04T09:00:00+01:00.');
-    Alert.alert('Approve scheduled uploads',`${selected.length} clips to ${platforms.join(', ')}. First upload: ${when}. Then every ${interval} hours. YouTube visibility: ${privacy}. Made for kids: ${madeForKids?'yes':'no'}. TikTok sends drafts to your inbox; finish posting and apply your caption in TikTok.`,[
+    Alert.alert('Approve scheduled uploads',`${selected.length} clips to ${platforms.join(', ')}. First upload: ${when}. Then every ${interval} hours. Title, caption and supported platform settings will be applied automatically when each item is due. YouTube visibility: ${privacy}. Made for kids: ${madeForKids?'yes':'no'}. TikTok sends a draft to your inbox; its API does not let this draft flow apply the caption or publish it, so finish those steps in TikTok.`,[
       {text:'Cancel',style:'cancel'},
       {text:'Schedule',onPress:()=>action(async()=>{await request('/api/queue','POST',{clip_ids:selected,platforms,title:title.trim(),caption,first_at:when,interval_hours:Number(interval),youtube_privacy:privacy,made_for_kids:madeForKids,consent:true});setSelected([]);Alert.alert('Scheduled','Your server will handle the uploads.');})}
     ]);
@@ -59,7 +59,7 @@ export default function Publishing({api,apiKey,mode}){
       </View>)}
     </>:<>
       <Text style={s.heading}>Schedule clips</Text>
-      <Text style={s.note}>Choose saved clips and connected accounts. Times must include a timezone. Titles and captions can be edited before you approve.</Text>
+      <Text style={s.note}>Choose saved clips and connected accounts. Times must include a timezone. Titles, captions and supported settings are applied automatically when scheduled uploads run. TikTok draft uploads still need you to finish the caption and publish in TikTok.</Text>
       {library.map(c=><Button key={c.id} text={(selected.includes(c.id)?'✓ ':'')+c.name} onPress={()=>toggle(selected,setSelected,c.id)}/>)}
       {!library.length&&<Text style={s.note}>No saved clips. Persistent storage must be enabled before creating clips for scheduling.</Text>}
       {social.platforms.filter(p=>p.connected).map(p=><Button key={p.platform} text={(platforms.includes(p.platform)?'✓ ':'')+p.platform} onPress={()=>toggle(platforms,setPlatforms,p.platform)}/>)}

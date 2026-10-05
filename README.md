@@ -33,17 +33,17 @@ npm ci
 npx expo start
 ```
 
-Use a matching Expo Go version for SDK 57 or a development build. In Settings, enter your HTTPS Render URL and access key. For local development use the computer's LAN IP, not localhost (which points to the phone). Settings and the clip list are currently held only in memory. Select a small MP4 first and create clips; tap a result to download/share it.
+Use a matching Expo Go version for SDK 57 or a development build. In Settings, enter your HTTPS server URL and access key. For local development use the computer's LAN IP or its Tailscale Funnel URL, not localhost (which points to the phone). Server settings are stored securely on the phone; the current clip list remains in memory. Select a video and create clips; tap a result to download/share it.
 
 ## Limits and remaining work
 
-This is a single-user prototype. The phone streams source files to the backend without loading the whole video into app memory. Uploads default to 2 GiB and 30 minutes; change `MAX_VIDEO_UPLOAD_BYTES` on the server to set another size limit. The server needs enough free disk space for the upload and processing. One render request is processed at a time. Short videos produce one clip rather than duplicates. Outputs are 720x1280 or 1280x720. Rendering is synchronous, so large jobs can take several minutes and need a reliable connection and an always-running server.
+This is a single-user prototype. The phone streams source files to the backend without loading the whole video into app memory. Uploads default to 2 GiB; change `MAX_VIDEO_UPLOAD_BYTES` on the server to set another size limit. The backend accepts the upload, then analyzes the source in sequential 10-minute batches in a background job, so long processing does not hold one HTTP request open. The server needs enough free disk space and must remain running until processing finishes. One video is processed at a time. Short videos produce one clip rather than duplicates. Outputs are 720x1280 or 1280x720.
 
 On the free demonstration service, clips are temporary: they disappear on restart/redeploy and older job folders are cleaned on subsequent uploads after 24 hours. Download important clips immediately. Free Render compute has not yet been benchmarked for this processing load.
 
-Social OAuth connections, encrypted token persistence, platform upload adapters and a publishing scheduler are implemented. See [SOCIAL_SETUP.md](SOCIAL_SETUP.md) for activation, required developer credentials and platform restrictions. The current free Render instance deliberately disables account connections/scheduling until persistent storage is configured. No platform credentials or live posting tests are included.
+Social OAuth connections, encrypted token persistence, platform upload adapters and a publishing scheduler are implemented. See [SOCIAL_SETUP.md](SOCIAL_SETUP.md) for activation, required developer credentials and platform restrictions. The current free Render instance deliberately disables account connections/scheduling until persistent storage is configured. A single always-on laptop can store its queue in a stable local `DATA_DIR`; enable `PERSISTENT_STORAGE_CONFIRMED=true` and `SCHEDULER_ENABLED=true` in its private `.env` file to run scheduled jobs there. No platform credentials or live posting tests are included.
 
-TikTok uses inbox drafts requiring completion in TikTok. Instagram and Facebook publish Reels to professional accounts/Pages. YouTube supports selected privacy and audience. Direct Post on TikTok is not implemented. An Android APK build workflow is provided; its native build result and phone testing must be checked separately.
+Scheduled jobs apply the title, caption and platform settings supported by each connected platform when their due time arrives. TikTok currently uses inbox drafts: the scheduled job uploads the draft at the due time, then the creator must finish its caption and publish in TikTok. Instagram and Facebook publish Reels to professional accounts/Pages. YouTube supports selected privacy and audience. Direct Post on TikTok is not implemented. An Android APK build workflow is provided; its native build result and phone testing must be checked separately.
 
 ## Verify
 

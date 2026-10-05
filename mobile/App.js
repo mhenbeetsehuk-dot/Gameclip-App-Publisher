@@ -20,6 +20,8 @@ export default function App(){
   const [busy,setBusy]=useState(false);
   const [uploadProgress,setUploadProgress]=useState(null);
   const [serverProcessing,setServerProcessing]=useState(false);
+  const [processingProgress,setProcessingProgress]=useState(0);
+  const [processingMessage,setProcessingMessage]=useState('');
   const [testingServer,setTestingServer]=useState(false);
   const [serverStatus,setServerStatus]=useState("");
   const [count,setCount]=useState(6);
@@ -92,7 +94,7 @@ export default function App(){
     if(!video){Alert.alert("Choose a video first");return}
     if(!apiKey.trim()){setTab("settings");Alert.alert("Set up your server","Enter the server URL and access key first.");return}
     setBusy(true);
-    setUploadProgress(0);setServerProcessing(false);
+    setUploadProgress(0);setServerProcessing(false);setProcessingProgress(0);setProcessingMessage('');
     try{
       const info=await LegacyFileSystem.getInfoAsync(video.uri);
       if (!info.exists) {
@@ -123,8 +125,20 @@ export default function App(){
       const response=await task.uploadAsync();
       let j; try {j=JSON.parse(response.body)} catch {throw new Error(`Server returned ${response.status}. Check your server and try again.`)}
       if(response.status<200||response.status>=300) throw new Error(typeof j.detail === "string" ? j.detail : "Check your clip settings and try again.");
-      setClips(j.clips || []);setTab("clips");
-      Alert.alert("Clips ready",`${(j.clips||[]).length} clips created. ${j.message||""}`);
+      if(!j.job_id)throw new Error('The server did not return a processing job ID. Update and restart the backend, then try again.');
+      setServerProcessing(true);setUploadProgress(1);
+      let result;
+      while(true){
+        await new Promise(resolve=>setTimeout(resolve,2500));
+        const check=await expoFetch(api.replace(/\/$/,"")+`/api/create-clips/${j.job_id}`,{headers:{'X-API-Key':apiKey}});
+        let state;try{state=JSON.parse(await check.text())}catch{throw new Error(`Could not read processing status (${check.status}). Keep the server running and try again.`)}
+        if(!check.ok)throw new Error(typeof state.detail==='string'?state.detail:`Could not check processing status (${check.status}).`);
+        setProcessingProgress(state.progress||0);setProcessingMessage(state.message||'Processing video…');
+        if(state.status==='completed'){result=state;break;}
+        if(state.status==='failed')throw new Error(state.message||'Video processing failed.');
+      }
+      setClips(result.clips || []);setTab("clips");
+      Alert.alert("Clips ready",`${(result.clips||[]).length} clips created. ${result.message||""}`);
     }catch(e){Alert.alert("Could not create clips",String(e.message||e))}
     finally{setBusy(false);setUploadProgress(null);setServerProcessing(false)}
   }
@@ -166,10 +180,10 @@ export default function App(){
           </Pressable>
 
           <Text style={s.note}>
-            Large videos are streamed from your phone to your server without loading the whole file into phone memory. The default size limit is 2 GB and duration limit is 30 minutes; the server needs enough free disk space to process the video.
+            Large videos are streamed from your phone to your server without loading the whole file into phone memory. The default size limit is 2 GB. The server analyzes selected parts in sequential 10-minute batches and needs enough free disk space; keep it running until processing finishes.
           </Text>
 
-          {busy ? <View style={s.progress}><ActivityIndicator color="#fff"/><Text style={s.note}>{serverProcessing?'Upload complete. Your server is creating clips…':`Uploading video… ${Math.round((uploadProgress||0)*100)}%`}</Text></View> :
+          {busy ? <View style={s.progress}><ActivityIndicator color="#fff"/><Text style={s.note}>{serverProcessing?`${processingMessage||'Upload complete. Your server is creating clips…'} ${Math.round(processingProgress*100)}%`:`Uploading video… ${Math.round((uploadProgress||0)*100)}%`}</Text></View> :
             <Pressable style={s.primary} onPress={createClips}>
               <Text style={s.white}>CREATE CLIPS</Text>
             </Pressable>}
