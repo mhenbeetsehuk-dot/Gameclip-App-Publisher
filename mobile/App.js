@@ -16,14 +16,47 @@ export default function App(){
   const [clips,setClips]=useState([]);
   const [video,setVideo]=useState(null);
   const [busy,setBusy]=useState(false);
+  const [testingServer,setTestingServer]=useState(false);
+  const [serverStatus,setServerStatus]=useState("");
   const [count,setCount]=useState(6);
   const [length,setLength]=useState(30);
   const [vertical,setVertical]=useState(true);
   const [tab,setTab]=useState("create");
 
-  useEffect(()=>{SecureStore.getItemAsync('gameclip-settings').then(raw=>{if(raw){const v=JSON.parse(raw);setApi(v.api);setApiKey(v.apiKey);}}).catch(()=>{});},[]);
+  useEffect(()=>{SecureStore.getItemAsync('gameclip-settings').then(raw=>{if(raw){const v=JSON.parse(raw);setApi(typeof v.api==='string'&&v.api?v.api:API);setApiKey(typeof v.apiKey==='string'?v.apiKey:'');}}).catch(()=>{});},[]);
   async function saveSettings(){
-    try {await SecureStore.setItemAsync('gameclip-settings',JSON.stringify({api,apiKey}));Alert.alert('Saved','Server settings saved securely on this phone.');}catch(e){Alert.alert('Could not save settings',String(e.message||e));}
+    const serverUrl=api.trim().replace(/\/+$/,'');
+    const accessKey=apiKey.trim();
+    if(!/^https:\/\//i.test(serverUrl)){Alert.alert('Check server URL','Enter the complete HTTPS address for your backend.');return;}
+    if(!accessKey){Alert.alert('Access key required','Enter the GAMECLIP_API_KEY configured on your backend.');return;}
+    try {
+      await SecureStore.setItemAsync('gameclip-settings',JSON.stringify({api:serverUrl,apiKey:accessKey}));
+      setApi(serverUrl);setApiKey(accessKey);setServerStatus('Settings saved securely on this phone.');
+      Alert.alert('Saved','Backend URL and access key saved securely on this phone.');
+    }catch(e){Alert.alert('Could not save settings',String(e.message||e));}
+  }
+
+  async function testServer(){
+    const serverUrl=api.trim().replace(/\/+$/,'');
+    const accessKey=apiKey.trim();
+    if(!/^https:\/\//i.test(serverUrl)){Alert.alert('Check server URL','Enter the complete HTTPS address for your backend.');return;}
+    if(!accessKey){Alert.alert('Access key required','Enter the GAMECLIP_API_KEY configured on your backend.');return;}
+    setTestingServer(true);setServerStatus('Testing backend…');
+    try{
+      const response=await expoFetch(serverUrl+'/api/social',{headers:{'X-API-Key':accessKey}});
+      const raw=await response.text();
+      let result;try{result=JSON.parse(raw)}catch{throw new Error(`The server returned an unexpected response (${response.status}).`)}
+      if(!response.ok)throw new Error(typeof result.detail==='string'?result.detail:`Server returned ${response.status}.`);
+      const tiktok=result.platforms?.find(x=>x.platform==='tiktok');
+      const summary=result.durable_storage
+        ? `Connected. Persistent storage is ready; scheduler ${result.scheduler_enabled?'is enabled':'is off'}.${tiktok?.configured?' TikTok credentials are configured.':tiktok?.reason?` ${tiktok.reason}`:''}`
+        : 'Backend reached, but persistent storage is not enabled. Account connections and scheduled uploads will not work until it is configured.';
+      setServerStatus(summary);Alert.alert('Backend test',summary);
+    }catch(e){
+      const message=String(e.message||e);
+      setServerStatus('Could not reach the backend. Check that it is running and the URL and access key are correct.');
+      Alert.alert('Backend test failed',message);
+    }finally{setTestingServer(false);}
   }
 
   async function pickVideo(){
@@ -121,13 +154,18 @@ export default function App(){
 
         {(tab==="queue"||tab==="accounts") && <Publishing api={api} apiKey={apiKey} mode={tab}/> }
         {tab==="settings" && <>
-          <Text style={s.h}>Settings</Text>
+          <Text style={s.h}>Server settings</Text>
+          <Text style={s.note}>Enter the HTTPS address of the computer or service running GameClip Publisher and its access key. These values are saved securely on this phone.</Text>
           <Text style={s.label}>SERVER URL</Text>
-          <TextInput style={[s.card,{color:"white"}]} value={api} onChangeText={setApi} autoCapitalize="none" autoCorrect={false} placeholder="https://your-server.onrender.com" placeholderTextColor="#8792a0"/>
+          <TextInput style={[s.card,{color:"white"}]} value={api} onChangeText={value=>{setApi(value);setServerStatus('');}} autoCapitalize="none" autoCorrect={false} keyboardType="url" placeholder="https://your-server.example.com" placeholderTextColor="#8792a0" accessibilityLabel="Server URL"/>
           <Text style={s.label}>ACCESS KEY</Text>
-          <TextInput style={[s.card,{color:"white"}]} value={apiKey} onChangeText={setApiKey} secureTextEntry autoCapitalize="none" autoCorrect={false}/>
-          <Pressable style={s.primary} onPress={saveSettings}><Text style={s.white}>Save settings</Text></Pressable>
-          <Text style={s.note}>Enter GAMECLIP_API_KEY from your server, then tap Save Settings. Connect your accounts in the Accounts tab.</Text>
+          <TextInput style={[s.card,{color:"white"}]} value={apiKey} onChangeText={value=>{setApiKey(value);setServerStatus('');}} secureTextEntry autoCapitalize="none" autoCorrect={false} placeholder="GAMECLIP_API_KEY from your server" placeholderTextColor="#8792a0" accessibilityLabel="Server access key"/>
+          <View style={s.settingsActions}>
+            <Pressable style={[s.primary,s.settingsAction]} disabled={testingServer} onPress={testServer}><Text style={s.white}>{testingServer?'Testing…':'Test connection'}</Text></Pressable>
+            <Pressable style={[s.primary,s.settingsAction]} onPress={saveSettings}><Text style={s.white}>Save settings</Text></Pressable>
+          </View>
+          {!!serverStatus&&<Text style={s.status}>{serverStatus}</Text>}
+          <Text style={s.note}>TikTok, YouTube, and Meta developer secrets belong on the backend; don’t enter them in the APK. Connect social accounts from the Accounts tab after the backend test succeeds.</Text>
         </>}
       </ScrollView>
     </View>
@@ -140,6 +178,8 @@ const s=StyleSheet.create({
   title:{color:"#fff",fontSize:27,fontWeight:"900"},
   sub:{color:"#8c97a5",marginTop:6,lineHeight:21},
   tabs:{flexDirection:"row",flexWrap:"wrap",gap:8,marginTop:25,marginBottom:25},
+  settingsActions:{flexDirection:"row",gap:10,flexWrap:"wrap"},
+  settingsAction:{flexGrow:1},
   tab:{backgroundColor:"#171e27",paddingVertical:10,paddingHorizontal:14,borderRadius:18},
   tabOn:{backgroundColor:"#2f81f7"},
   h:{color:"#fff",fontSize:28,fontWeight:"800",marginBottom:18},
@@ -153,6 +193,7 @@ const s=StyleSheet.create({
   primary:{backgroundColor:"#2f81f7",padding:17,borderRadius:13,alignItems:"center",marginTop:25},
   white:{color:"#fff",fontWeight:"700"},
   card:{backgroundColor:"#151b23",padding:18,borderRadius:14,marginTop:15},
+  status:{color:"#b8d7ff",lineHeight:21,marginTop:16},
   big:{color:"#fff",fontSize:26,fontWeight:"800",marginTop:6},
   small:{color:"#808b99",marginTop:5}
 });

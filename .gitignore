@@ -14,5 +14,6 @@ secrets/
 .pytest_cache/
 mobile/android/
 mobile/ios/
+mobile/dist/
 core
 core.*
