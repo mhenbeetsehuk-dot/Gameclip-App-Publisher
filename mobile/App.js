@@ -6,9 +6,11 @@ import Publishing from "./Publishing";
 import * as SecureStore from "expo-secure-store";
 import * as Sharing from "expo-sharing";
 import { File, Paths } from "expo-file-system";
+import * as LegacyFileSystem from "expo-file-system/legacy";
 import { fetch as expoFetch } from "expo/fetch";
 
 const API=process.env.EXPO_PUBLIC_API_URL || "https://gameclip-publisher.onrender.com";
+const MAX_VIDEO_BYTES=2*1024*1024*1024;
 
 export default function App(){
   const [api,setApi]=useState(API);
@@ -16,6 +18,8 @@ export default function App(){
   const [clips,setClips]=useState([]);
   const [video,setVideo]=useState(null);
   const [busy,setBusy]=useState(false);
+  const [uploadProgress,setUploadProgress]=useState(null);
+  const [serverProcessing,setServerProcessing]=useState(false);
   const [testingServer,setTestingServer]=useState(false);
   const [serverStatus,setServerStatus]=useState("");
   const [count,setCount]=useState(6);
@@ -62,7 +66,16 @@ export default function App(){
   async function pickVideo(){
     try {
       const result = await DocumentPicker.getDocumentAsync({type:"video/*",copyToCacheDirectory:true,multiple:false});
-      if (!result.canceled) setVideo(result.assets[0]);
+      if (!result.canceled) {
+        const asset=result.assets[0];
+        const info=asset.size==null?await LegacyFileSystem.getInfoAsync(asset.uri):null;
+        const size=asset.size??info?.size;
+        if(typeof size==='number'&&size>MAX_VIDEO_BYTES){
+          Alert.alert('Video is too large',`This file is ${(size/1024/1024/1024).toFixed(1)} GB. The current limit is 2 GB. Choose a shorter video or increase MAX_VIDEO_UPLOAD_BYTES on your server.`);
+          return;
+        }
+        setVideo({...asset,size});
+      }
     } catch(e) { Alert.alert("Could not select video", String(e.message || e)); }
   }
 
@@ -79,24 +92,41 @@ export default function App(){
     if(!video){Alert.alert("Choose a video first");return}
     if(!apiKey.trim()){setTab("settings");Alert.alert("Set up your server","Enter the server URL and access key first.");return}
     setBusy(true);
+    setUploadProgress(0);setServerProcessing(false);
     try{
-      const file = new File(video.uri);
-      if (!file.exists) {
+      const info=await LegacyFileSystem.getInfoAsync(video.uri);
+      if (!info.exists) {
         throw new Error("The selected video cannot be read by the app. Please grant Photos/Videos permission and try again.");
       }
-      const f=new FormData();
-      f.append("video", file, video.name || "gameplay.mp4");
-      f.append("clip_count",String(count));
-      f.append("clip_duration",String(length));
-      f.append("vertical",String(vertical));
-      const r=await expoFetch(api.replace(/\/$/, "")+"/api/create-clips",{method:"POST",body:f,headers:{"X-API-Key":apiKey}});
-      const raw=await r.text();
-      let j; try {j=JSON.parse(raw)} catch {throw new Error(`Server returned ${r.status}. Check the server URL or try a shorter video.`)}
-      if(!r.ok) throw new Error(typeof j.detail === "string" ? j.detail : "Check your clip settings and try again.");
+      const size=video.size??info.size;
+      if(typeof size==='number'&&size>MAX_VIDEO_BYTES){
+        throw new Error(`This video is ${(size/1024/1024/1024).toFixed(1)} GB, above the current 2 GB limit. Increase MAX_VIDEO_UPLOAD_BYTES on the server to allow it.`);
+      }
+      const task=LegacyFileSystem.createUploadTask(
+        api.replace(/\/$/, "")+"/api/create-clips",
+        video.uri,
+        {
+          httpMethod:'POST',
+          uploadType:LegacyFileSystem.FileSystemUploadType.MULTIPART,
+          fieldName:'video',
+          mimeType:video.mimeType||'video/mp4',
+          headers:{'X-API-Key':apiKey},
+          parameters:{clip_count:String(count),clip_duration:String(length),vertical:String(vertical)},
+        },
+        ({totalBytesSent,totalBytesExpectedToSend})=>{
+          if(totalBytesExpectedToSend>0){
+            setUploadProgress(Math.min(1,totalBytesSent/totalBytesExpectedToSend));
+            if(totalBytesSent>=totalBytesExpectedToSend)setServerProcessing(true);
+          }
+        }
+      );
+      const response=await task.uploadAsync();
+      let j; try {j=JSON.parse(response.body)} catch {throw new Error(`Server returned ${response.status}. Check your server and try again.`)}
+      if(response.status<200||response.status>=300) throw new Error(typeof j.detail === "string" ? j.detail : "Check your clip settings and try again.");
       setClips(j.clips || []);setTab("clips");
       Alert.alert("Clips ready",`${(j.clips||[]).length} clips created. ${j.message||""}`);
     }catch(e){Alert.alert("Could not create clips",String(e.message||e))}
-    finally{setBusy(false)}
+    finally{setBusy(false);setUploadProgress(null);setServerProcessing(false)}
   }
 
   return (
@@ -136,10 +166,10 @@ export default function App(){
           </Pressable>
 
           <Text style={s.note}>
-            The server chooses sections using visual motion and creates clips. Use a video under 200 MB and 30 minutes. Short videos may produce fewer clips.
+            Large videos are streamed from your phone to your server without loading the whole file into phone memory. The default size limit is 2 GB and duration limit is 30 minutes; the server needs enough free disk space to process the video.
           </Text>
 
-          {busy ? <ActivityIndicator color="#fff" style={{marginTop:28}}/> :
+          {busy ? <View style={s.progress}><ActivityIndicator color="#fff"/><Text style={s.note}>{serverProcessing?'Upload complete. Your server is creating clips…':`Uploading video… ${Math.round((uploadProgress||0)*100)}%`}</Text></View> :
             <Pressable style={s.primary} onPress={createClips}>
               <Text style={s.white}>CREATE CLIPS</Text>
             </Pressable>}
@@ -180,6 +210,7 @@ const s=StyleSheet.create({
   tabs:{flexDirection:"row",flexWrap:"wrap",gap:8,marginTop:25,marginBottom:25},
   settingsActions:{flexDirection:"row",gap:10,flexWrap:"wrap"},
   settingsAction:{flexGrow:1},
+  progress:{alignItems:"center",marginTop:16},
   tab:{backgroundColor:"#171e27",paddingVertical:10,paddingHorizontal:14,borderRadius:18},
   tabOn:{backgroundColor:"#2f81f7"},
   h:{color:"#fff",fontSize:28,fontWeight:"800",marginBottom:18},

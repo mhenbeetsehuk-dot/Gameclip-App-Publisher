@@ -37,7 +37,7 @@ Use a matching Expo Go version for SDK 57 or a development build. In Settings, e
 
 ## Limits and remaining work
 
-This is a single-user prototype. Uploads are limited to 200 MB and 30 minutes. One render request is processed at a time. Short videos produce one clip rather than duplicates. Outputs are 720x1280 or 1280x720. Rendering is synchronous; large jobs may exceed hosting request limits. Start with small videos. A durable worker queue is needed for long-running production use.
+This is a single-user prototype. The phone streams source files to the backend without loading the whole video into app memory. Uploads default to 2 GiB and 30 minutes; change `MAX_VIDEO_UPLOAD_BYTES` on the server to set another size limit. The server needs enough free disk space for the upload and processing. One render request is processed at a time. Short videos produce one clip rather than duplicates. Outputs are 720x1280 or 1280x720. Rendering is synchronous, so large jobs can take several minutes and need a reliable connection and an always-running server.
 
 On the free demonstration service, clips are temporary: they disappear on restart/redeploy and older job folders are cleaned on subsequent uploads after 24 hours. Download important clips immediately. Free Render compute has not yet been benchmarked for this processing load.
 

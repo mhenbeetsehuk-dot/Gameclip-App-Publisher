@@ -16,7 +16,7 @@ from .clipper import action_windows, render, duration
 router = APIRouter()
 ROOT = Path(os.getenv('CLIP_DIR', str(store.data_dir() / 'clips')))
 LOCK = threading.Lock()
-MAX_BYTES = 200 * 1024 * 1024
+MAX_BYTES = int(os.getenv('MAX_VIDEO_UPLOAD_BYTES', str(2 * 1024 * 1024 * 1024)))
 TTL = 24 * 3600
 
 
@@ -41,8 +41,13 @@ def create_clips(video: UploadFile = File(...), clip_count: int = Form(6, ge=1, 
         for old in ROOT.iterdir():
             if not store.durable() and old.is_dir() and old.stat().st_mtime < time.time() - TTL:
                 shutil.rmtree(old)
-        if shutil.disk_usage(ROOT).free < 600*1024*1024:
-            raise HTTPException(507,'Server storage is nearly full. Remove downloaded clips before uploading more.')
+        received_size = getattr(video, 'size', None)
+        if received_size is not None and received_size > MAX_BYTES:
+            limit_mb = MAX_BYTES // (1024 * 1024)
+            raise HTTPException(413, f'Choose a video no larger than {limit_mb} MB.')
+        required_free = 600 * 1024 * 1024 + (received_size or 0)
+        if shutil.disk_usage(ROOT).free < required_free:
+            raise HTTPException(507, 'The server needs more free disk space to process this video. Free up space and try again.')
         ext = Path(video.filename or '').suffix.lower()
         if ext not in {'.mp4', '.mov', '.mkv', '.webm', '.m4v'}:
             raise HTTPException(400, 'Choose an MP4, MOV, MKV, WebM or M4V video.')
@@ -53,7 +58,8 @@ def create_clips(video: UploadFile = File(...), clip_count: int = Form(6, ge=1, 
             while chunk := video.file.read(1024 * 1024):
                 size += len(chunk)
                 if size > MAX_BYTES:
-                    raise HTTPException(413, 'Choose a video smaller than 200 MB.')
+                    limit_mb = MAX_BYTES // (1024 * 1024)
+                    raise HTTPException(413, f'Choose a video no larger than {limit_mb} MB.')
                 dest.write(chunk)
         if not size:
             raise HTTPException(400, 'The selected video is empty.')
