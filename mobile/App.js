@@ -126,6 +126,11 @@ export default function App(){
       let j; try {j=JSON.parse(response.body)} catch {throw new Error(`Server returned ${response.status}. Check your server and try again.`)}
       if(response.status<200||response.status>=300) throw new Error(typeof j.detail === "string" ? j.detail : "Check your clip settings and try again.");
       if(!j.job_id)throw new Error('The server did not return a processing job ID. Update and restart the backend, then try again.');
+      // DocumentPicker copied the selected video into this app's cache. The
+      // server has its own copy now, so release phone storage; the gallery
+      // original is not touched.
+      try{await LegacyFileSystem.deleteAsync(video.uri,{idempotent:true});}catch{}
+      setVideo(null);
       setServerProcessing(true);setUploadProgress(1);
       let result;
       while(true){
