@@ -23,6 +23,10 @@ export GAMECLIP_API_KEY='replace-with-a-long-random-key'
 
 Windows PowerShell: use `.venv\Scripts\python -m pip install -r requirements.txt`, set `$env:GAMECLIP_API_KEY='your-key'`, then run `.venv\Scripts\python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000`.
 
+## Use the computer dashboard
+
+Start the backend and open `http://127.0.0.1:8000` in Chrome on the same computer. Enter the `GAMECLIP_API_KEY` from the private `.env` file. The browser dashboard supports video upload and clip creation, account connections, the clip library, and scheduled uploads. The access key is held in the open browser tab and is not saved. To open the dashboard from another device, use the computer's Tailscale Funnel HTTPS address and keep Funnel and the backend running.
+
 Docker alternatively packages FFmpeg with Python. `render.yaml` uses Render's Python runtime, which includes FFmpeg, with a generated `GAMECLIP_API_KEY` and `/health` health check. The Dockerfile remains available for deployments elsewhere. Enter that generated value into the phone settings; never put it in EXPO_PUBLIC variables or Git.
 
 ## Run the phone app

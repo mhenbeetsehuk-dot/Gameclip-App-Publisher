@@ -8,6 +8,7 @@ from .social import router as social_router
 from .queue import router as queue_router, run
 from . import store
 from .legal import home, privacy, terms
+from .dashboard import dashboard
 
 @asynccontextmanager
 async def lifespan(app):
@@ -26,7 +27,10 @@ app.include_router(social_router)
 app.include_router(queue_router)
 
 @app.get('/', response_class=HTMLResponse)
-def root():return home()
+def root():return dashboard()
+
+@app.get('/welcome', response_class=HTMLResponse)
+def welcome():return home()
 
 @app.get('/terms', response_class=HTMLResponse)
 def terms_page():return terms()

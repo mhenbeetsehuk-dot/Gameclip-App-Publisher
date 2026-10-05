@@ -15,6 +15,10 @@ AUTH = {'X-API-Key': 'test-key'}
 
 def test_health_and_access_control(client):
     assert client.get('/health').status_code == 200
+    dashboard = client.get('/')
+    assert dashboard.status_code == 200
+    assert 'Connect to your server' in dashboard.text
+    assert 'sequential 10-minute batches' in dashboard.text
     assert client.get('/api/clips/job-abc/clip_01.mp4').status_code == 401
     assert client.post('/api/create-clips', files={'video': ('v.mp4', b'bad')}).status_code == 401
 
